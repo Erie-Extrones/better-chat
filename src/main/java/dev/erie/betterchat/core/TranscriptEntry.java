@@ -28,6 +28,8 @@ public class TranscriptEntry {
 	public String senderName;
 	/** Sender UUID (string form) if known; used to fetch the head skin. */
 	public String senderUuid;
+	/** Nickname the line showed, when it differs from {@link #senderName}. */
+	public String senderNick;
 	/** True when another mod (RankMute) stopped this message from reaching the chat HUD. */
 	public boolean hidden;
 	/** Human-readable name of whatever hid the message, e.g. "RankMute". */
@@ -93,6 +95,7 @@ public class TranscriptEntry {
 		}
 		String q = query.toLowerCase();
 		return plainText().toLowerCase().contains(q)
-				|| (senderName != null && senderName.toLowerCase().contains(q));
+				|| (senderName != null && senderName.toLowerCase().contains(q))
+				|| (senderNick != null && senderNick.toLowerCase().contains(q));
 	}
 }

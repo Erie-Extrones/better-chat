@@ -3,6 +3,7 @@ package dev.erie.betterchat;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.erie.betterchat.core.DefaultPatterns;
 import dev.erie.betterchat.core.SpamRule;
 import dev.erie.betterchat.font.ChatFonts;
 
@@ -31,6 +32,10 @@ public class BetterChatConfig {
 	public boolean mentionHighlight = true;
 	/** Add a "Transcript" button to the chat screen. */
 	public boolean chatScreenButton = true;
+	/** Draw the sender's head in front of each chat line in the HUD. */
+	public boolean hudHeads = true;
+	/** Minecraft fakes bold by double-drawing, which looks wrong with TrueType fonts; drop bold while a TTF font is selected. */
+	public boolean stripBoldWithFont = true;
 
 	/** Rules for repetitive server lines (crate announcements and the like). See {@link SpamRule}. */
 	public List<SpamRule> spamRules = defaultSpamRules();
@@ -49,10 +54,19 @@ public class BetterChatConfig {
 	public int chatClearThreshold = 20;
 	public long chatClearWindowMs = 3000;
 	/**
-	 * Optional regex with one capture group that extracts the sender name from a system-style chat line,
-	 * used only when the sender could not be worked out from the message itself or the tab list.
+	 * Regexes, tried in order, whose first capture group is the sender name of a system-style chat line.
+	 * Used when the message itself carries no sender. Names are then matched against the tab list,
+	 * nicknames included.
 	 */
-	public String senderPattern = "";
+	public List<String> senderPatterns = new ArrayList<>(DefaultPatterns.SENDER);
+
+	/** Patterns with named groups {@code name}/{@code text}/{@code amount} that recognise private messages and payments. */
+	public List<String> pmIncomingPatterns = new ArrayList<>(DefaultPatterns.PM_INCOMING);
+	public List<String> pmOutgoingPatterns = new ArrayList<>(DefaultPatterns.PM_OUTGOING);
+	public List<String> payReceivedPatterns = new ArrayList<>(DefaultPatterns.PAY_RECEIVED);
+	public List<String> paySentPatterns = new ArrayList<>(DefaultPatterns.PAY_SENT);
+	/** Write private messages and payments to {@code config/betterchat/interactions.jsonl}. */
+	public boolean interactionsSaveToDisk = true;
 	/** java.time pattern for the time column in the transcript screen. */
 	public String timeFormat = "HH:mm:ss";
 
@@ -63,6 +77,18 @@ public class BetterChatConfig {
 				"^\\W*Crates\\W+Player (\\S+) just got the (.+?) reward from the (.+?) Crate",
 				SpamRule.Action.COLLAPSE, "$1 got $2 ($3 crate)", 1, 15));
 		return rules;
+	}
+
+	private static List<String> cleanList(List<String> list) {
+		List<String> out = new ArrayList<>();
+		if (list != null) {
+			for (String s : list) {
+				if (s != null && !s.isBlank()) {
+					out.add(s);
+				}
+			}
+		}
+		return out;
 	}
 
 	/** Fills in anything Gson left null or out of range so the rest of the mod never null-checks. */
@@ -101,9 +127,11 @@ public class BetterChatConfig {
 		if (chatClearWindowMs < 0) {
 			chatClearWindowMs = 0;
 		}
-		if (senderPattern == null) {
-			senderPattern = "";
-		}
+		senderPatterns = cleanList(senderPatterns);
+		pmIncomingPatterns = cleanList(pmIncomingPatterns);
+		pmOutgoingPatterns = cleanList(pmOutgoingPatterns);
+		payReceivedPatterns = cleanList(payReceivedPatterns);
+		paySentPatterns = cleanList(paySentPatterns);
 		if (timeFormat == null || timeFormat.isBlank()) {
 			timeFormat = "HH:mm:ss";
 		}

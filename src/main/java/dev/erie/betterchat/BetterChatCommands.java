@@ -15,15 +15,20 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 
 import dev.erie.betterchat.core.FormattingCodes;
+import dev.erie.betterchat.core.InteractionClassifier;
+import dev.erie.betterchat.core.InteractionEntry;
 import dev.erie.betterchat.core.SpamFilter;
 import dev.erie.betterchat.core.SpamRule;
 import dev.erie.betterchat.font.ChatFont;
 import dev.erie.betterchat.font.ChatFonts;
 import dev.erie.betterchat.font.CustomFonts;
+import dev.erie.betterchat.gui.PlayerScreen;
 import dev.erie.betterchat.gui.ScreenOpener;
 import dev.erie.betterchat.gui.SettingsScreen;
 import dev.erie.betterchat.gui.TranscriptScreen;
 import dev.erie.betterchat.hud.SpamControl;
+import dev.erie.betterchat.transcript.InteractionLog;
+import dev.erie.betterchat.transcript.SenderResolver;
 import dev.erie.betterchat.transcript.TranscriptManager;
 
 /** {@code /betterchat ...} client-only commands. None of these reach the server. */
@@ -64,7 +69,52 @@ public final class BetterChatCommands {
 											return builder.buildFuture();
 										})
 										.executes(ctx -> setSpam(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "index"), StringArgumentType.getString(ctx, "action")))))))
+				.then(literal("player").then(argument("name", StringArgumentType.word())
+						.suggests((ctx, builder) -> {
+							for (InteractionEntry e : InteractionLog.partners()) {
+								builder.suggest(e.player);
+							}
+							return builder.buildFuture();
+						})
+						.executes(ctx -> openPlayer(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
+				.then(literal("interactions")
+						.executes(ctx -> listPartners(ctx.getSource()))
+						.then(literal("test").then(argument("text", StringArgumentType.greedyString())
+								.executes(ctx -> testInteraction(ctx.getSource(), StringArgumentType.getString(ctx, "text"))))))
 				.then(literal("reload").executes(ctx -> reload(ctx.getSource()))));
+	}
+
+	private static int openPlayer(FabricClientCommandSource source, String name) {
+		SenderResolver.Sender who = SenderResolver.lookup(name);
+		String realName = who.name() != null ? who.name() : name;
+		String uuid = who.uuid() == null ? null : who.uuid().toString();
+		ScreenOpener.openNextTick(() -> new PlayerScreen(null, realName, uuid, who.nick()));
+		return OK;
+	}
+
+	private static int listPartners(FabricClientCommandSource source) {
+		List<InteractionEntry> partners = InteractionLog.partners();
+		if (partners.isEmpty()) {
+			info(source, "No private messages or payments recorded yet.");
+			return OK;
+		}
+		info(source, "Players with recorded messages or payments (newest first): "
+				+ String.join(", ", partners.stream().map(e -> e.player).toList()) + ". Open one with /betterchat player <name>.");
+		return OK;
+	}
+
+	private static int testInteraction(FabricClientCommandSource source, String text) {
+		InteractionClassifier.Match m = InteractionLog.classifier().classify(FormattingCodes.strip(text));
+		if (m == null) {
+			info(source, "Not recognised as a private message or payment. Add a pattern to config/betterchat.json if it should be.");
+		} else {
+			info(source, "Recognised as " + InteractionClassifier.label(m.kind()) + " with " + m.name() + ": " + m.text());
+		}
+		List<String> errors = InteractionLog.classifier().errors();
+		if (!errors.isEmpty()) {
+			error(source, errors.size() + " interaction pattern(s) are invalid and skipped; see the log.");
+		}
+		return OK;
 	}
 
 	private static int listSpam(FabricClientCommandSource source) {
@@ -181,6 +231,7 @@ public final class BetterChatCommands {
 	private static int reload(FabricClientCommandSource source) {
 		boolean clean = ConfigManager.load();
 		TranscriptManager.init();
+		InteractionLog.init();
 		List<CustomFonts.CustomFont> before = CustomFonts.list();
 		List<CustomFonts.CustomFont> after = CustomFonts.refresh();
 		boolean fontsChanged = !before.equals(after);

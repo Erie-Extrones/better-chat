@@ -74,6 +74,12 @@ public class SettingsScreen extends Screen {
 				"Colour lines that say your name gold and mark them with an @.");
 		row++;
 
+		this.toggle(leftX, rowY(row), "Heads in chat", cfg.hudHeads, v -> ConfigManager.get().hudHeads = v,
+				"Draw the sender's head in front of each chat line.");
+		this.toggle(rightX, rowY(row), "No bold with fonts", cfg.stripBoldWithFont, v -> ConfigManager.get().stripBoldWithFont = v,
+				"Drop bold while a TrueType font is selected; Minecraft's fake bold smears those fonts.");
+		row++;
+
 		this.toggle(leftX, rowY(row), "Input box font", cfg.inputBoxFont, v -> ConfigManager.get().inputBoxFont = v,
 				"Draw what you type in the chat font too.");
 		this.toggle(rightX, rowY(row), "Transcript button in chat", cfg.chatScreenButton, v -> ConfigManager.get().chatScreenButton = v,

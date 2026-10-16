@@ -82,6 +82,11 @@ public final class ChatFonts {
 		ConfigManager.save();
 	}
 
+	/** True while a TrueType font is selected and bold should be dropped (see {@link BoldStripper}). */
+	public static boolean stripBold() {
+		return ConfigManager.get().stripBoldWithFont && !current().isDefault();
+	}
+
 	/**
 	 * Wraps a chat message so it renders in the current font. Returns the message unchanged for the
 	 * default font or when it is already wrapped.
@@ -94,6 +99,7 @@ public final class ChatFonts {
 		if (description.equals(message.getStyle().getFont())) {
 			return message;
 		}
-		return Component.empty().withStyle(style -> style.withFont(description)).append(message);
+		Component body = ConfigManager.get().stripBoldWithFont ? BoldStripper.strip(message) : message;
+		return Component.empty().withStyle(style -> style.withFont(description)).append(body);
 	}
 }

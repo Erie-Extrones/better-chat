@@ -52,6 +52,11 @@ public final class ComponentSnapshots {
 
 	/** Rebuilds a renderable component. {@code baseStyle} is applied underneath every segment (e.g. the chat font). */
 	public static MutableComponent toComponent(List<TextSegment> segments, Style baseStyle) {
+		return toComponent(segments, baseStyle, true);
+	}
+
+	/** As above; with {@code keepBold} false, bold is dropped (TrueType fonts render it badly). */
+	public static MutableComponent toComponent(List<TextSegment> segments, Style baseStyle, boolean keepBold) {
 		MutableComponent root = Component.empty().setStyle(baseStyle == null ? Style.EMPTY : baseStyle);
 		if (segments == null) {
 			return root;
@@ -64,7 +69,7 @@ public final class ComponentSnapshots {
 			if (segment.color() != null) {
 				style = style.withColor(segment.color());
 			}
-			if (segment.bold()) {
+			if (segment.bold() && keepBold) {
 				style = style.withBold(true);
 			}
 			if (segment.italic()) {
@@ -85,7 +90,8 @@ public final class ComponentSnapshots {
 					style = style.withFont(new FontDescription.Resource(id));
 				}
 			}
-			root.append(Component.literal(segment.text()).setStyle(style));
+			String text = keepBold ? segment.text() : dev.erie.betterchat.font.BoldStripper.stripCodes(segment.text());
+			root.append(Component.literal(text).setStyle(style));
 		}
 		return root;
 	}

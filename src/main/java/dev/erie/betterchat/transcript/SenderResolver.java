@@ -1,7 +1,9 @@
 package dev.erie.betterchat.transcript;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -12,17 +14,18 @@ import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 
 import org.jspecify.annotations.Nullable;
 
 import dev.erie.betterchat.BetterChatClient;
 import dev.erie.betterchat.ConfigManager;
+import dev.erie.betterchat.core.FormattingCodes;
 import dev.erie.betterchat.core.SenderNameFinder;
 
 /**
@@ -30,23 +33,36 @@ import dev.erie.betterchat.core.SenderNameFinder;
  * <ol>
  *   <li>the signed sender the server attached (player chat packets);</li>
  *   <li>a player hover card or a {@code /msg <name>} click action embedded in the message by the server's chat plugin;</li>
- *   <li>the earliest online username (tab list) appearing as a whole word in the line;</li>
- *   <li>the optional {@code senderPattern} regex from the config.</li>
+ *   <li>the {@code senderPatterns} regexes from the config (the server's {@code Title : ~Name › message} format);</li>
+ *   <li>the earliest online username appearing as a whole word in the line.</li>
  * </ol>
+ *
+ * <p>Names found in the line are matched against the tab list, including the nicknames shown there
+ * ({@code ~Rebzyyx} may be the nickname of a player whose real name is different), so the real name
+ * and UUID are known and the right head can be drawn.
  */
 public final class SenderResolver {
 	/** {@code /msg Name ...}, {@code /tell Name}, {@code /w Name}, ... as put in click actions by chat plugins. */
-	private static final Pattern WHISPER_COMMAND = Pattern.compile("^/?(?:msg|tell|w|whisper|m|pm|message|r|reply)\\s+([A-Za-z0-9_.]{1,16})\\b", Pattern.CASE_INSENSITIVE);
+	private static final Pattern WHISPER_COMMAND = Pattern.compile("^/?(?:msg|tell|w|whisper|m|pm|message|r|reply)\\s+~?([A-Za-z0-9_.]{1,16})\\b", Pattern.CASE_INSENSITIVE);
 	private static final Identifier PLAYER_ID = Identifier.withDefaultNamespace("player");
 
-	private static @Nullable Pattern configuredPattern;
+	private static List<Pattern> configuredPatterns = List.of();
 	private static @Nullable String configuredPatternSource;
 
 	private SenderResolver() {
 	}
 
-	public record Sender(@Nullable String name, @Nullable UUID uuid) {
-		public static final Sender UNKNOWN = new Sender(null, null);
+	/**
+	 * @param name the player's real username when known, else what the line showed
+	 * @param uuid the player's UUID if known
+	 * @param nick the nickname the line used when it differs from the real name
+	 */
+	public record Sender(@Nullable String name, @Nullable UUID uuid, @Nullable String nick) {
+		public static final Sender UNKNOWN = new Sender(null, null, null);
+
+		public Sender(@Nullable String name, @Nullable UUID uuid) {
+			this(name, uuid, null);
+		}
 
 		public boolean known() {
 			return name != null || uuid != null;
@@ -63,16 +79,43 @@ public final class SenderResolver {
 			return complete(embedded);
 		}
 
-		Sender online = fromTabList(plainText);
-		if (online.known()) {
-			return online;
+		for (Pattern pattern : patterns()) {
+			String name = SenderNameFinder.fromPattern(plainText, pattern);
+			if (name != null) {
+				return lookup(name);
+			}
 		}
 
-		String fromPattern = SenderNameFinder.fromPattern(plainText, pattern());
-		if (fromPattern != null) {
-			return complete(new Sender(fromPattern, null));
+		Map<String, PlayerInfo> online = onlineNames();
+		String found = SenderNameFinder.findOnlineName(plainText, online.keySet());
+		if (found != null) {
+			return fromInfo(found, online.get(found));
 		}
 		return Sender.UNKNOWN;
+	}
+
+	/** Resolves a name seen in chat (real name or nickname) against the tab list; falls back to the name as-is. */
+	public static Sender lookup(String name) {
+		if (name == null || name.isBlank()) {
+			return Sender.UNKNOWN;
+		}
+		Map<String, PlayerInfo> online = onlineNames();
+		PlayerInfo info = online.get(name);
+		if (info == null) {
+			for (Map.Entry<String, PlayerInfo> e : online.entrySet()) {
+				if (e.getKey().equalsIgnoreCase(name)) {
+					info = e.getValue();
+					break;
+				}
+			}
+		}
+		return info == null ? new Sender(name, null) : fromInfo(name, info);
+	}
+
+	private static Sender fromInfo(String shownName, PlayerInfo info) {
+		GameProfile profile = info.getProfile();
+		String real = profile.name() != null ? profile.name() : shownName;
+		return new Sender(real, profile.id(), real.equalsIgnoreCase(shownName) ? null : shownName);
 	}
 
 	/** Looks at every style in the message for a player hover card or a whisper click action. */
@@ -115,24 +158,36 @@ public final class SenderResolver {
 		return info.type != null && PLAYER_ID.equals(BuiltInRegistries.ENTITY_TYPE.getKey(info.type));
 	}
 
-	static Sender fromTabList(String plainText) {
+	/**
+	 * Every way an online player can be referred to: their real name plus each word of their tab-list
+	 * display name (which carries nicknames and rank tags). Real names win on conflicts.
+	 */
+	static Map<String, PlayerInfo> onlineNames() {
+		Map<String, PlayerInfo> names = new LinkedHashMap<>();
 		ClientPacketListener connection = Minecraft.getInstance().getConnection();
 		if (connection == null) {
-			return Sender.UNKNOWN;
+			return names;
 		}
-		List<String> names = new ArrayList<>();
-		for (PlayerInfo info : connection.getOnlinePlayers()) {
+		List<PlayerInfo> infos = new ArrayList<>(connection.getOnlinePlayers());
+		for (PlayerInfo info : infos) {
 			GameProfile profile = info.getProfile();
-			if (profile != null && profile.name() != null) {
-				names.add(profile.name());
+			if (profile != null && profile.name() != null && !profile.name().isBlank()) {
+				names.put(profile.name(), info);
 			}
 		}
-		String name = SenderNameFinder.findOnlineName(plainText, names);
-		if (name == null) {
-			return Sender.UNKNOWN;
+		for (PlayerInfo info : infos) {
+			Component display = info.getTabListDisplayName();
+			if (display == null) {
+				continue;
+			}
+			String plain = FormattingCodes.strip(display.getString());
+			for (String token : plain.split("[^A-Za-z0-9_]+")) {
+				if (token.length() >= 2 && token.length() <= 16) {
+					names.putIfAbsent(token, info);
+				}
+			}
 		}
-		PlayerInfo info = connection.getPlayerInfo(name);
-		return new Sender(name, info == null ? null : info.getProfile().id());
+		return names;
 	}
 
 	/** Fills in a missing name or UUID from the tab list when the other half is known. */
@@ -142,10 +197,7 @@ public final class SenderResolver {
 			return sender;
 		}
 		if (sender.uuid() == null && sender.name() != null) {
-			PlayerInfo info = connection.getPlayerInfo(sender.name());
-			if (info != null) {
-				return new Sender(sender.name(), info.getProfile().id());
-			}
+			return lookup(sender.name());
 		} else if (sender.name() == null && sender.uuid() != null) {
 			PlayerInfo info = connection.getPlayerInfo(sender.uuid());
 			if (info != null) {
@@ -155,13 +207,21 @@ public final class SenderResolver {
 		return sender;
 	}
 
-	/** Compiles the configured regex once per distinct value; invalid values are logged and ignored. */
-	private static @Nullable Pattern pattern() {
-		String source = ConfigManager.get().senderPattern;
-		if (!source.equals(configuredPatternSource)) {
-			configuredPatternSource = source;
-			configuredPattern = SenderNameFinder.compilePattern(source, BetterChatClient.LOGGER::warn);
+	/** Compiles the configured regexes once per distinct list; invalid values are logged and skipped. */
+	private static List<Pattern> patterns() {
+		List<String> sources = ConfigManager.get().senderPatterns;
+		String key = String.join("\n", sources);
+		if (!key.equals(configuredPatternSource)) {
+			configuredPatternSource = key;
+			List<Pattern> compiled = new ArrayList<>();
+			for (String source : sources) {
+				Pattern p = SenderNameFinder.compilePattern(source, BetterChatClient.LOGGER::warn);
+				if (p != null) {
+					compiled.add(p);
+				}
+			}
+			configuredPatterns = compiled;
 		}
-		return configuredPattern;
+		return configuredPatterns;
 	}
 }

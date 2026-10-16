@@ -14,7 +14,6 @@
   "transcriptKeepHidden": true,
   "chatClearThreshold": 20,
   "chatClearWindowMs": 3000,
-  "senderPattern": "",
   "timeFormat": "HH:mm:ss",
   "spamRules": [
     {
@@ -27,5 +26,32 @@
     }
   ],
   "spamSummary": true,
-  "spamSummaryDelaySeconds": 3
+  "spamSummaryDelaySeconds": 3,
+  "hudHeads": true,
+  "stripBoldWithFont": true,
+  "senderPatterns": [
+    "^[^:]{0,80}:\\s*~?([A-Za-z0-9_]{1,16})\\s*[›»>:]",
+    "^\\s*<~?([A-Za-z0-9_]{2,16})>"
+  ],
+  "pmIncomingPatterns": [
+    "(?i)^\\W*(?:pm|msg|whisper|message)?\\W*~?(?<name>[A-Za-z0-9_]{2,16})\\s*(?:->|→|»|>)\\s*(?:me|you)\\W*\\s*(?<text>.*)$",
+    "(?i)^(?:from|msg from|message from|pm from)\\s+~?(?<name>[A-Za-z0-9_]{2,16})\\s*[:›»>]\\s*(?<text>.*)$",
+    "(?i)^~?(?<name>[A-Za-z0-9_]{2,16}) whispers(?: to you)?:\\s*(?<text>.*)$"
+  ],
+  "pmOutgoingPatterns": [
+    "(?i)^\\W*(?:pm|msg|whisper|message)?\\W*(?:me|you)\\s*(?:->|→|»|>)\\s*~?(?<name>[A-Za-z0-9_]{2,16})\\W*\\s*(?<text>.*)$",
+    "(?i)^(?:to|msg to|message to|pm to)\\s+~?(?<name>[A-Za-z0-9_]{2,16})\\s*[:›»>]\\s*(?<text>.*)$",
+    "(?i)^you whisper to ~?(?<name>[A-Za-z0-9_]{2,16}):\\s*(?<text>.*)$"
+  ],
+  "payReceivedPatterns": [
+    "(?i)(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)\\s+(?:has been|was)\\s+received from\\s+~?(?<name>[A-Za-z0-9_]{2,16})",
+    "(?i)~?(?<name>[A-Za-z0-9_]{2,16})\\s+(?:has\\s+)?(?:sent|paid|gave)\\s+you\\s+(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)",
+    "(?i)you (?:have )?(?:received|got|were paid)\\s+(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)\\s+from\\s+~?(?<name>[A-Za-z0-9_]{2,16})"
+  ],
+  "paySentPatterns": [
+    "(?i)(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)\\s+(?:has been|was)\\s+sent to\\s+~?(?<name>[A-Za-z0-9_]{2,16})",
+    "(?i)you (?:have )?(?:sent|paid|gave)\\s+(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)\\s+to\\s+~?(?<name>[A-Za-z0-9_]{2,16})",
+    "(?i)you (?:have )?(?:sent|paid|gave)\\s+~?(?<name>[A-Za-z0-9_]{2,16})\\s+(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)"
+  ],
+  "interactionsSaveToDisk": true
 }

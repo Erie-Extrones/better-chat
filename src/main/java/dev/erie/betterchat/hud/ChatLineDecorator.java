@@ -3,13 +3,16 @@ package dev.erie.betterchat.hud;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.contents.objects.PlayerSprite;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.component.ResolvableProfile;
 
 import org.jspecify.annotations.Nullable;
 
@@ -58,14 +61,50 @@ public final class ChatLineDecorator {
 			}
 		}
 
+		MutableComponent prefix = Component.empty();
+		boolean prefixed = false;
 		if (cfg.hudTimestamps) {
-			MutableComponent stamped = Component.empty();
-			stamped.append(Component.literal("[" + formatTime(System.currentTimeMillis(), cfg.hudTimestampFormat) + "] ").withStyle(ChatFormatting.DARK_GRAY));
-			stamped.append(result);
-			result = stamped;
+			prefix.append(Component.literal("[" + formatTime(System.currentTimeMillis(), cfg.hudTimestampFormat) + "] ").withStyle(ChatFormatting.DARK_GRAY));
+			prefixed = true;
+		}
+		if (cfg.hudHeads) {
+			Component head = headOf(entry);
+			if (head != null) {
+				prefix.append(head).append(" ");
+				prefixed = true;
+			}
+		}
+		if (prefixed) {
+			result = prefix.append(result);
 		}
 
 		return ChatFonts.apply(result);
+	}
+
+	/**
+	 * An inline player-head glyph for the line's sender, or {@code null} when the sender is unknown.
+	 * Uses the game's own object component, so the skin is fetched and drawn by vanilla code.
+	 */
+	private static @Nullable Component headOf(@Nullable TranscriptEntry entry) {
+		if (entry == null || entry.kind == TranscriptEntry.Kind.MARKER || (entry.senderUuid == null && entry.senderName == null)) {
+			return null;
+		}
+		ResolvableProfile profile = null;
+		if (entry.senderUuid != null) {
+			try {
+				profile = ResolvableProfile.createUnresolved(UUID.fromString(entry.senderUuid));
+			} catch (IllegalArgumentException ignored) {
+				// Fall through to the name.
+			}
+		}
+		if (profile == null) {
+			if (entry.senderName == null || !entry.senderName.matches("[A-Za-z0-9_]{1,16}")) {
+				return null;
+			}
+			profile = ResolvableProfile.createUnresolved(entry.senderName);
+		}
+		// Empty fallback so the plain-text form of the line (logs, copy) does not gain "[name head]".
+		return Component.object(new PlayerSprite(profile, true), Component.empty());
 	}
 
 	/** The line names the local player and was not sent by them. */

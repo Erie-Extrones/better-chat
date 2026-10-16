@@ -12,7 +12,11 @@ import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import dev.erie.betterchat.ConfigManager;
+import net.minecraft.client.Minecraft;
+
 import dev.erie.betterchat.core.FormattingCodes;
+import dev.erie.betterchat.core.InteractionClassifier;
+import dev.erie.betterchat.core.InteractionEntry;
 import dev.erie.betterchat.core.SpamFilter;
 import dev.erie.betterchat.core.TranscriptEntry;
 import dev.erie.betterchat.hud.SpamControl;
@@ -96,9 +100,18 @@ public final class ChatCapture {
 
 		String plain = FormattingCodes.strip(message.getString());
 		if (!plain.isBlank()) {
-			SenderResolver.Sender sender = SenderResolver.resolve(message, signedSender, plain);
+			InteractionClassifier.Match interaction = InteractionLog.classifyAndRecord(plain);
+			SenderResolver.Sender sender;
+			if (interaction != null && interaction.kind() == InteractionEntry.Kind.PM_OUT) {
+				sender = new SenderResolver.Sender(InteractionLog.me(), Minecraft.getInstance().getUser().getProfileId());
+			} else if (interaction != null) {
+				sender = SenderResolver.lookup(interaction.name());
+			} else {
+				sender = SenderResolver.resolve(message, signedSender, plain);
+			}
 			entry.senderName = sender.name();
 			entry.senderUuid = sender.uuid() == null ? null : sender.uuid().toString();
+			entry.senderNick = sender.nick();
 		}
 		pending = entry;
 		return entry;

@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import dev.erie.betterchat.font.ChatFonts;
 import dev.erie.betterchat.hud.ChatScreenHooks;
 import dev.erie.betterchat.transcript.ChatCapture;
+import dev.erie.betterchat.transcript.InteractionLog;
 import dev.erie.betterchat.transcript.TranscriptManager;
 
 public class BetterChatClient implements ClientModInitializer {
@@ -19,6 +20,8 @@ public class BetterChatClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ConfigManager.load();
 		TranscriptManager.init();
+		InteractionLog.init();
+		InteractionLog.register();
 		ChatCapture.register();
 		ChatScreenHooks.register();
 		Keybinds.register();

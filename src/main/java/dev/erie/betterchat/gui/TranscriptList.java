@@ -125,6 +125,9 @@ class TranscriptList extends AbstractScrollArea {
 		MutableComponent header = Component.literal(this.screen.formatTime(entry.time) + " ").withStyle(ChatFormatting.DARK_GRAY);
 		if (entry.senderName != null) {
 			header.append(Component.literal(entry.senderName).withStyle(ChatFormatting.YELLOW));
+			if (entry.senderNick != null && !entry.senderNick.equalsIgnoreCase(entry.senderName)) {
+				header.append(Component.literal(" (~" + entry.senderNick + ")").withStyle(ChatFormatting.GRAY));
+			}
 		} else {
 			header.append(Component.literal(entry.kind == TranscriptEntry.Kind.CHAT ? "Player" : "Server").withStyle(ChatFormatting.DARK_AQUA));
 		}
@@ -132,7 +135,7 @@ class TranscriptList extends AbstractScrollArea {
 			header.append(Component.literal("  hidden from chat by " + (entry.hiddenBy == null ? "a filter" : entry.hiddenBy)).withStyle(ChatFormatting.RED));
 		}
 
-		Component message = ComponentSnapshots.toComponent(entry.segments, ChatFonts.current().style());
+		Component message = ComponentSnapshots.toComponent(entry.segments, ChatFonts.current().style(), !ChatFonts.stripBold());
 		List<FormattedCharSequence> lines = this.font.split(message, Math.max(20, width));
 		int textHeight = (1 + lines.size()) * this.font.lineHeight;
 		int height = Math.max(HEAD + 2 * PAD, textHeight + 2 * PAD) + 2;
@@ -217,6 +220,9 @@ class TranscriptList extends AbstractScrollArea {
 			lines.add(Component.literal("Hidden from the chat HUD by " + (entry.hiddenBy == null ? "a filter" : entry.hiddenBy)).withStyle(ChatFormatting.RED).getVisualOrderText());
 		}
 		lines.add(Component.literal(entry == this.copiedEntry && System.currentTimeMillis() < this.copiedUntil ? "Copied!" : "Click to copy").withStyle(ChatFormatting.GREEN).getVisualOrderText());
+		if (entry.senderName != null || entry.senderUuid != null) {
+			lines.add(Component.literal("Click the head: private messages and payments with this player").withStyle(ChatFormatting.AQUA).getVisualOrderText());
+		}
 		return lines;
 	}
 
@@ -243,6 +249,12 @@ class TranscriptList extends AbstractScrollArea {
 		}
 		Row row = this.rowAt(event.y());
 		if (row != null && row.entry.kind != TranscriptEntry.Kind.MARKER) {
+			boolean onHead = event.x() >= this.getX() + PAD && event.x() < this.getX() + PAD + HEAD
+					&& (row.entry.senderName != null || row.entry.senderUuid != null);
+			if (onHead) {
+				ScreenOpener.open(PlayerScreen.forEntry(this.screen, row.entry));
+				return true;
+			}
 			Minecraft.getInstance().keyboardHandler.setClipboard(row.entry.plainText());
 			this.copiedEntry = row.entry;
 			this.copiedUntil = System.currentTimeMillis() + 1500;

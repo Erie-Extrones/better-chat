@@ -16,6 +16,7 @@ Supported Minecraft versions: **26.3** and **26.1.2** (one jar per version). Req
 - Block chat clears: blank lines are dropped before they reach the chat, so a staff chat clear cannot push your chat away. The transcript still notes that a clear happened.
 - Mention ping: a line that says your username plays a note-block pling, turns gold and gets an `@` in front. Your own messages do not ping.
 - Longer history: the chat keeps 500 lines instead of vanilla's 100 (100 to 10000 in the menu).
+- No bold with fonts: Minecraft fakes bold by drawing glyphs twice, which smears TrueType fonts, so bold is dropped while a bundled or custom font is selected.
 - A `Transcript` button in the top-right corner of the chat screen.
 
 **Spam rules.** Repetitive server lines such as crate announcements (`Crates » Player X just got the Y reward from the Z Crate - INFINITY!`) can be hidden, collapsed or rewritten. A rule is a regex plus an action:
@@ -29,13 +30,18 @@ Supported Minecraft versions: **26.3** and **26.1.2** (one jar per version). Req
 
 Hidden lines are still in the transcript, labelled with the rule that hid them. The crate rule ships enabled; switch its action in `/betterchat` > Spam rules, and add your own with `/betterchat spam add <regex>` or in the config.
 
-**Transcript.** A scrollable screen with every chat line received, oldest at the top, newest at the bottom, with the sender's head next to each message, the time, and the sender's name.
+**Heads in chat.** The chat HUD draws the sender's head in front of each line (after the timestamp), using the game's own inline player-head glyph.
+
+**Transcript.** A scrollable screen with every chat line received, oldest at the top, newest at the bottom, with the sender's head next to each message, the time, and the sender's name (and nickname, when the server shows one).
 
 - Lines RankMute hid from chat are in the transcript too, tinted red and labelled `hidden from chat by RankMute`.
 - A server-side chat clear (the usual burst of blank lines) never reaches the transcript. Instead one grey marker says the chat was cleared; everything above it stays.
 - Search box (message text or player name) and a filter: all messages, only those shown in chat, only hidden ones, only player messages.
 - Everything is saved to `config/betterchat/transcripts/<date>.jsonl`, one file per day, so logs survive restarts. `<` and `>` page through earlier days; `Today (live)` jumps back to the live view.
 - Click a message to copy its text to the clipboard. Hovering shows the exact date and time, the sender's UUID, the server address and why it was hidden, if it was.
+- Click a player's head to open their page.
+
+**Player pages.** Every private message between you and that player and every payment either way, oldest first, with totals (messages, money sent, money received). Opened by clicking a head in the transcript or with `/betterchat player <name>`. Private messages are picked up from the server's chat lines (`[Name -> me] ...`, `From Name: ...`, `Name whispers to you: ...` and the like) and from the `/msg`, `/tell`, `/w`, `/r` and `/pay` commands you send; payments from lines such as `$500 has been sent to Name`, `Name has sent you $500` or `You paid $500 to Name`. Everything is kept in `config/betterchat/interactions.jsonl`. The exact wording differs per server: paste a real line into `/betterchat interactions test <text>` to see whether it is recognised and add a pattern to the config if not.
 
 ## Install
 
@@ -55,6 +61,9 @@ The mod is marked `"environment": "client"` and is ignored on servers.
 | `/betterchat transcript` | Open the transcript. |
 | `/betterchat fonts` | List font ids, each drawn in its own font. |
 | `/betterchat font <id>` | Set the chat font, e.g. `/betterchat font chewy`. Tab-completes. |
+| `/betterchat player <name>` | Open a player's page (private messages and payments). Tab-completes players you have interacted with. |
+| `/betterchat interactions` | List players with recorded messages or payments. |
+| `/betterchat interactions test <text>` | Report whether a pasted line counts as a private message or payment, and with whom. |
 | `/betterchat spam` | List the spam rules with their index and action. |
 | `/betterchat spam test <text>` | Report which rule a line would match and what would happen to it. Paste a real line from `.minecraft/logs/latest.log`. |
 | `/betterchat spam add <regex>` | Add a collapse rule. Rename it or change its action, replacement and window in the config. |
@@ -70,10 +79,10 @@ Most servers with rank plugins send chat as plain system messages with no sender
 
 1. If the server attached a signed sender (vanilla-style player chat), that is used.
 2. Otherwise, a player hover card or a `/msg <name>` click action embedded in the line by the chat plugin.
-3. Otherwise, the earliest online username (from the tab list) that appears as a whole word in the line. This is what matches the `Wanderer : Meigha hello` format.
-4. Otherwise, the optional `senderPattern` regex from the config.
+3. Otherwise, the `senderPatterns` regexes from the config, tried in order. The default matches the `Title : ~Name › message` format (any title with icons before the colon, an optional `~` nickname marker, then `›`, `»`, `>` or `:` after the name) and vanilla's `<Name> message`.
+4. Otherwise, the earliest online username that appears as a whole word in the line.
 
-Lines where no sender is found get a grey `!` head and are labelled `Server`.
+A name found this way is matched against the tab list, including the nicknames and tags in players' tab-list entries, so a nickname resolves to the real player and their skin. Lines where no sender is found get a grey `!` head and are labelled `Server`.
 
 ## Config
 
@@ -89,6 +98,8 @@ File: `config/betterchat.json`. Written with defaults if missing; see [`config.e
 | `mentionSound` | `true` | Play a pling when a line says your username (whole word, any case). |
 | `mentionHighlight` | `true` | Colour such lines gold and mark them with `@`. Text the server coloured explicitly keeps its colour. |
 | `chatScreenButton` | `true` | Show a Transcript button in the chat screen. |
+| `hudHeads` | `true` | Draw the sender's head in front of each chat line. |
+| `stripBoldWithFont` | `true` | Drop bold while a TrueType font is selected. |
 | `hudTimestampFormat` | `HH:mm` | java.time pattern for the chat prefix. |
 | `spamRules` | one crate rule | List of `{ "name", "pattern", "action", "replacement", "maxPerWindow", "windowSeconds" }`. `pattern` is a Java regex matched anywhere in the line with `§` codes stripped (use `(?i)` for case-insensitive); the first matching rule wins. `replacement` uses `$1`, `$2`... for the regex groups. `maxPerWindow` 0 = unlimited. |
 | `spamSummary` | `true` | Post the "N more line(s) hidden" line after a burst goes quiet. |
@@ -99,7 +110,9 @@ File: `config/betterchat.json`. Written with defaults if missing; see [`config.e
 | `transcriptKeepHidden` | `true` | Record lines that RankMute (or any other mod) hid from chat. |
 | `chatClearThreshold` | `20` | This many blank lines within `chatClearWindowMs` of each other count as a chat clear and become one marker. Blank lines are never recorded on their own. |
 | `chatClearWindowMs` | `3000` | See above. |
-| `senderPattern` | `""` | Optional Java regex whose first capture group is the sender name, used only when steps 1 to 3 above fail. Example for `Rank : Name msg`: `^\S+ : (\S+)`. Invalid patterns are logged and ignored. |
+| `senderPatterns` | see above | Java regexes, tried in order, whose first capture group is the sender name. Invalid patterns are logged and skipped. |
+| `pmIncomingPatterns`, `pmOutgoingPatterns`, `payReceivedPatterns`, `paySentPatterns` | common plugin wordings | Regexes with named groups `(?<name>...)` for the other player, `(?<text>...)` for a message body and `(?<amount>...)` for money. Matched anywhere in the line, `§` codes stripped; the first match wins. |
+| `interactionsSaveToDisk` | `true` | Write private messages and payments to `config/betterchat/interactions.jsonl`. |
 | `timeFormat` | `HH:mm:ss` | java.time pattern for the time shown in the transcript. |
 
 If the file cannot be parsed, a warning is logged and defaults are used in memory. The broken file is left untouched until the next change saves it.
