@@ -17,6 +17,18 @@ class InteractionClassifierTest {
 	}
 
 	@Test
+	void serverFormatFromScreenshot() {
+		InteractionClassifier c = defaults();
+		// Icon glyphs in the real lines may be private-use characters; these stand in for them.
+		check(c.classify("\u2612 MESSAGE ME \u2708 webnooblet \u270e no not right now"), InteractionEntry.Kind.PM_OUT, "webnooblet", "no not right now");
+		check(c.classify("\u2612 MESSAGE ME \u2708 webnooblet \u270e wp"), InteractionEntry.Kind.PM_OUT, "webnooblet", "wp");
+		check(c.classify("\u2612 MESSAGE webnooblet \u2708 ME \u270e sure, one sec"), InteractionEntry.Kind.PM_IN, "webnooblet", "sure, one sec");
+		check(c.classify("MESSAGE ~notspoke \ue001 ME \ue002 hey"), InteractionEntry.Kind.PM_IN, "notspoke", "hey");
+		assertNull(c.classify("\u25a0 EMPEROR : ~notspoke \u203a why dont i just ah"));
+		assertNull(c.classify("[-] BR_WhiteNova52"));
+	}
+
+	@Test
 	void incomingPrivateMessages() {
 		InteractionClassifier c = defaults();
 		check(c.classify("[Rebzyyx -> me] hey there"), InteractionEntry.Kind.PM_IN, "Rebzyyx", "hey there");

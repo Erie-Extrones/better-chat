@@ -10,7 +10,7 @@ public final class DefaultPatterns {
 	private DefaultPatterns() {
 	}
 
-	private static final String NAME = "~?(?<name>[A-Za-z0-9_]{2,16})";
+	private static final String NAME = "~?(?<name>[A-Za-z0-9_]{1,16})";
 	private static final String AMOUNT = "(?<amount>[$€£]?\\s?[0-9][0-9,.]*[kKmMbB]?)";
 
 	/**
@@ -21,12 +21,19 @@ public final class DefaultPatterns {
 			"^[^:]{0,80}:\\s*~?([A-Za-z0-9_]{1,16})\\s*[›»>:]",
 			"^\\s*<~?([A-Za-z0-9_]{2,16})>");
 
+	/**
+	 * Private messages. The first pattern of each list is the server this mod was written against:
+	 * {@code MESSAGE name ✈ ME ✎ text} and {@code MESSAGE ME ✈ name ✎ text}, where the arrow and pen are
+	 * icon glyphs, so any run of non-word characters is accepted between the parts.
+	 */
 	public static final List<String> PM_INCOMING = List.of(
+			"(?i)^\\W*message\\W+" + NAME + "\\W+(?:me|you)\\W+(?<text>.*)$",
 			"(?i)^\\W*(?:pm|msg|whisper|message)?\\W*" + NAME + "\\s*(?:->|→|»|>)\\s*(?:me|you)\\W*\\s*(?<text>.*)$",
 			"(?i)^(?:from|msg from|message from|pm from)\\s+" + NAME + "\\s*[:›»>]\\s*(?<text>.*)$",
 			"(?i)^" + NAME + " whispers(?: to you)?:\\s*(?<text>.*)$");
 
 	public static final List<String> PM_OUTGOING = List.of(
+			"(?i)^\\W*message\\W+(?:me|you)\\W+" + NAME + "\\W+(?<text>.*)$",
 			"(?i)^\\W*(?:pm|msg|whisper|message)?\\W*(?:me|you)\\s*(?:->|→|»|>)\\s*" + NAME + "\\W*\\s*(?<text>.*)$",
 			"(?i)^(?:to|msg to|message to|pm to)\\s+" + NAME + "\\s*[:›»>]\\s*(?<text>.*)$",
 			"(?i)^you whisper to " + NAME + ":\\s*(?<text>.*)$");
