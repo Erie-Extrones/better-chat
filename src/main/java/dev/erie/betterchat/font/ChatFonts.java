@@ -1,5 +1,6 @@
 package dev.erie.betterchat.font;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.network.chat.Component;
@@ -12,9 +13,10 @@ import dev.erie.betterchat.ConfigManager;
 /**
  * The fonts the chat can be switched to, and the one currently selected.
  *
- * <p>Every bundled font is a TrueType file in {@code assets/betterchat/} with a font definition in
- * {@code assets/betterchat/font/<id>.json}. Each definition falls back to {@code minecraft:default}
- * for glyphs the TTF lacks (icons, CJK, server resource-pack glyphs), so nothing turns into boxes.
+ * <p>Every bundled font is a TrueType file in {@code assets/betterchat/font/} with a font definition
+ * next to it. Each definition falls back to {@code minecraft:default} for glyphs the TTF lacks (icons,
+ * CJK, server resource-pack glyphs), so nothing turns into boxes. Fonts the player dropped into
+ * {@code config/betterchat/fonts/} are appended; see {@link CustomFonts}.
  *
  * <p>Switching needs no resource reload: the font is applied per message, as a parent style, by
  * {@code ChatComponentMixin}. Text that already carries an explicit font (e.g. a server's icon
@@ -25,7 +27,7 @@ public final class ChatFonts {
 
 	public static final ChatFont DEFAULT = new ChatFont(DEFAULT_ID, "Minecraft (default)", null);
 
-	private static final List<ChatFont> ALL = List.of(
+	private static final List<ChatFont> BUNDLED = List.of(
 			DEFAULT,
 			ChatFont.bundled("chewy", "Chewy"),
 			ChatFont.bundled("fredoka", "Fredoka"),
@@ -34,11 +36,24 @@ public final class ChatFonts {
 			ChatFont.bundled("nunito", "Nunito"),
 			ChatFont.bundled("pixelifysans", "Pixelify Sans"));
 
+	private static List<CustomFonts.CustomFont> customSource = null;
+	private static List<ChatFont> all = BUNDLED;
+
 	private ChatFonts() {
 	}
 
-	public static List<ChatFont> all() {
-		return ALL;
+	/** Bundled fonts followed by the player's custom fonts. */
+	public static synchronized List<ChatFont> all() {
+		List<CustomFonts.CustomFont> custom = CustomFonts.list();
+		if (custom != customSource) {
+			List<ChatFont> fonts = new ArrayList<>(BUNDLED);
+			for (CustomFonts.CustomFont font : custom) {
+				fonts.add(ChatFont.bundled(font.id(), font.displayName()));
+			}
+			all = List.copyOf(fonts);
+			customSource = custom;
+		}
+		return all;
 	}
 
 	/** Case-insensitive lookup by id or display name; {@code null} if unknown. */
@@ -47,7 +62,7 @@ public final class ChatFonts {
 			return null;
 		}
 		String wanted = id.trim();
-		for (ChatFont font : ALL) {
+		for (ChatFont font : all()) {
 			if (font.id().equalsIgnoreCase(wanted) || font.displayName().equalsIgnoreCase(wanted)) {
 				return font;
 			}
@@ -69,7 +84,7 @@ public final class ChatFonts {
 
 	/**
 	 * Wraps a chat message so it renders in the current font. Returns the message unchanged for the
-	 * default font or when it is already wrapped (the mixin may see the same message more than once).
+	 * default font or when it is already wrapped.
 	 */
 	public static Component apply(Component message) {
 		FontDescription description = current().description();

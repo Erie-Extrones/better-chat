@@ -3,7 +3,8 @@
 	"package": "dev.erie.betterchat.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"ChatComponentMixin"
+		"ChatComponentMixin",
+		"MinecraftMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

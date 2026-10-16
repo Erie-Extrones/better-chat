@@ -3,6 +3,8 @@ package dev.erie.betterchat;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
+import java.util.List;
+
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 
@@ -13,6 +15,7 @@ import net.minecraft.network.chat.Component;
 
 import dev.erie.betterchat.font.ChatFont;
 import dev.erie.betterchat.font.ChatFonts;
+import dev.erie.betterchat.font.CustomFonts;
 import dev.erie.betterchat.gui.ScreenOpener;
 import dev.erie.betterchat.gui.SettingsScreen;
 import dev.erie.betterchat.gui.TranscriptScreen;
@@ -76,8 +79,16 @@ public final class BetterChatCommands {
 	private static int reload(FabricClientCommandSource source) {
 		boolean clean = ConfigManager.load();
 		TranscriptManager.init();
+		List<CustomFonts.CustomFont> before = CustomFonts.list();
+		List<CustomFonts.CustomFont> after = CustomFonts.refresh();
+		boolean fontsChanged = !before.equals(after);
+		if (fontsChanged) {
+			// New or removed TTF files only take effect through a resource reload, which rebuilds the font pack.
+			source.getClient().reloadResourcePacks();
+		}
 		if (clean) {
-			ok(source, "Config reloaded. Font: " + ChatFonts.current().displayName() + ".");
+			ok(source, "Config reloaded. Font: " + ChatFonts.current().displayName() + ". Custom fonts: " + after.size()
+					+ (fontsChanged ? " (reloading resources)" : "") + ".");
 		} else {
 			error(source, "Config could not be parsed; using defaults. See the log for details.");
 		}

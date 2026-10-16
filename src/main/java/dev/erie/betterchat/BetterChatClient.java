@@ -7,6 +7,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 
 import dev.erie.betterchat.font.ChatFonts;
+import dev.erie.betterchat.hud.ChatScreenHooks;
 import dev.erie.betterchat.transcript.ChatCapture;
 import dev.erie.betterchat.transcript.TranscriptManager;
 
@@ -19,6 +20,7 @@ public class BetterChatClient implements ClientModInitializer {
 		ConfigManager.load();
 		TranscriptManager.init();
 		ChatCapture.register();
+		ChatScreenHooks.register();
 		Keybinds.register();
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> BetterChatCommands.register(dispatcher));
 		LOGGER.info("Better Chat loaded: font '{}', {} transcript entr(y/ies) from today",

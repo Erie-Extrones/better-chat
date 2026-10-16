@@ -11,6 +11,7 @@ import net.minecraft.resources.Identifier;
 
 import org.jspecify.annotations.Nullable;
 
+import dev.erie.betterchat.ConfigManager;
 import dev.erie.betterchat.core.FormattingCodes;
 import dev.erie.betterchat.core.TranscriptEntry;
 
@@ -25,11 +26,15 @@ import dev.erie.betterchat.core.TranscriptEntry;
  * the others, then exactly one of {@code *_CANCELED} (something hid it) or {@code GAME}/{@code CHAT}
  * (it was shown). The entry is held as "pending" across that sequence and committed at the end, so it
  * knows whether it was hidden.
+ *
+ * <p>This is also where blank lines are dropped before they reach the chat HUD when
+ * {@code blockChatClear} is on: a server-side chat clear is nothing but a burst of blank lines.
  */
 public final class ChatCapture {
 	private static final Identifier PHASE = Identifier.fromNamespaceAndPath("betterchat", "capture");
 
 	private static @Nullable TranscriptEntry pending;
+	private static @Nullable TranscriptEntry lastCommitted;
 
 	private ChatCapture() {
 	}
@@ -37,8 +42,14 @@ public final class ChatCapture {
 	public static void register() {
 		ClientReceiveMessageEvents.ALLOW_GAME.addPhaseOrdering(PHASE, Event.DEFAULT_PHASE);
 		ClientReceiveMessageEvents.ALLOW_GAME.register(PHASE, (message, overlay) -> {
-			if (!overlay) {
-				begin(message, null, TranscriptEntry.Kind.SYSTEM);
+			if (overlay) {
+				return true;
+			}
+			TranscriptEntry entry = begin(message, null, TranscriptEntry.Kind.SYSTEM);
+			if (ConfigManager.get().blockChatClear && entry.isBlank()) {
+				// Keeps the HUD intact; the transcript still counts the blank burst and writes its marker.
+				commit(false);
+				return false;
 			}
 			return true;
 		});
@@ -62,7 +73,7 @@ public final class ChatCapture {
 		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> commit(false));
 	}
 
-	private static void begin(Component message, @Nullable GameProfile signedSender, TranscriptEntry.Kind kind) {
+	private static TranscriptEntry begin(Component message, @Nullable GameProfile signedSender, TranscriptEntry.Kind kind) {
 		// A previous message whose follow-up event never fired (a listener threw) is still worth keeping.
 		commit(false);
 
@@ -79,6 +90,7 @@ public final class ChatCapture {
 			entry.senderUuid = sender.uuid() == null ? null : sender.uuid().toString();
 		}
 		pending = entry;
+		return entry;
 	}
 
 	private static void commit(boolean hidden) {
@@ -91,7 +103,18 @@ public final class ChatCapture {
 			entry.hidden = true;
 			entry.hiddenBy = filterName();
 		}
+		lastCommitted = entry;
 		TranscriptManager.add(entry);
+	}
+
+	/**
+	 * The entry committed for the line that is about to be added to the chat HUD, or {@code null}.
+	 * Consumed by the HUD decorator so it knows who sent the line (the events run right before the HUD add).
+	 */
+	public static @Nullable TranscriptEntry takeLastCommitted() {
+		TranscriptEntry entry = lastCommitted;
+		lastCommitted = null;
+		return entry;
 	}
 
 	/** Name of the mod that hides chat, for the "hidden by" label. */

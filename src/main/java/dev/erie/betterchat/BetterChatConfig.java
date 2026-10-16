@@ -8,6 +8,25 @@ import dev.erie.betterchat.font.ChatFonts;
 public class BetterChatConfig {
 	/** Id of the chat font; one of the ids listed by {@code /betterchat fonts}. {@code default} = vanilla. */
 	public String font = ChatFonts.DEFAULT_ID;
+	/** Also draw what you type in the chat input box in that font. */
+	public boolean inputBoxFont = true;
+	/** Pixel size for TrueType fonts dropped into {@code config/betterchat/fonts}. Vanilla text is about 8 px tall. */
+	public float customFontSize = 9.0f;
+
+	/** Prefix every chat line in the HUD with the time it arrived. */
+	public boolean hudTimestamps = true;
+	/** java.time pattern for that prefix. */
+	public String hudTimestampFormat = "HH:mm";
+	/** How many lines the chat HUD keeps. Vanilla keeps 100. */
+	public int chatHistoryLines = 500;
+	/** Drop blank lines before they reach the chat HUD, so a server-side chat clear cannot push your chat away. */
+	public boolean blockChatClear = true;
+	/** Play a sound when a chat line mentions your username. */
+	public boolean mentionSound = true;
+	/** Colour chat lines that mention your username gold and mark them with an {@code @}. */
+	public boolean mentionHighlight = true;
+	/** Add a "Transcript" button to the chat screen. */
+	public boolean chatScreenButton = true;
 
 	/** Most entries kept in memory (and shown in the transcript screen) for the current day. */
 	public int transcriptMaxEntries = 5000;
@@ -30,6 +49,18 @@ public class BetterChatConfig {
 	public BetterChatConfig normalize() {
 		if (font == null || font.isBlank()) {
 			font = ChatFonts.DEFAULT_ID;
+		}
+		if (!(customFontSize >= 4.0f && customFontSize <= 64.0f)) {
+			customFontSize = 9.0f;
+		}
+		if (hudTimestampFormat == null || hudTimestampFormat.isBlank()) {
+			hudTimestampFormat = "HH:mm";
+		}
+		if (chatHistoryLines < 100) {
+			chatHistoryLines = 100;
+		}
+		if (chatHistoryLines > 10000) {
+			chatHistoryLines = 10000;
 		}
 		if (transcriptMaxEntries < 100) {
 			transcriptMaxEntries = 100;

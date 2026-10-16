@@ -20,6 +20,7 @@ public final class ConfigManager {
 	private static final String FILE_NAME = "betterchat.json";
 
 	private static BetterChatConfig config = new BetterChatConfig();
+	private static boolean loaded = false;
 
 	private ConfigManager() {
 	}
@@ -33,12 +34,17 @@ public final class ConfigManager {
 		return FabricLoader.getInstance().getConfigDir().resolve(BetterChatClient.MOD_ID);
 	}
 
+	/** The current config. Loads the file on first use, which can be before the mod initializer runs (resource pack discovery). */
 	public static BetterChatConfig get() {
+		if (!loaded) {
+			load();
+		}
 		return config;
 	}
 
 	/** Re-reads the file. Writes defaults if it is missing. Returns true if the file parsed cleanly. */
 	public static synchronized boolean load() {
+		loaded = true;
 		Path file = path();
 		if (!Files.exists(file)) {
 			config = new BetterChatConfig();

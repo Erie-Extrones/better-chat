@@ -13,6 +13,7 @@ import dev.erie.betterchat.BetterChatClient;
 import dev.erie.betterchat.BetterChatConfig;
 import dev.erie.betterchat.ConfigManager;
 import dev.erie.betterchat.core.ChatClearDetector;
+import dev.erie.betterchat.core.Mentions;
 import dev.erie.betterchat.core.TranscriptEntry;
 import dev.erie.betterchat.core.TranscriptStore;
 
@@ -66,7 +67,13 @@ public final class TranscriptManager {
 	public static void add(TranscriptEntry entry) {
 		long now = entry.time;
 		if (entry.kind != TranscriptEntry.Kind.MARKER && entry.isBlank()) {
-			if (clearDetector.feed(true, now)) {
+			// One message holding many line breaks clears just as well as many blank messages.
+			int lines = Mentions.lineCount(entry.plainText());
+			boolean cleared = false;
+			for (int i = 0; i < lines; i++) {
+				cleared |= clearDetector.feed(true, now);
+			}
+			if (cleared) {
 				store(TranscriptEntry.marker(now, entry.server,
 						"Chat was cleared by the server (" + clearDetector.blankRun() + "+ blank lines). Everything above is still here."));
 			}

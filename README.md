@@ -6,7 +6,17 @@ Supported Minecraft versions: **26.3** and **26.1.2** (one jar per version). Req
 
 ## What it does
 
-**Chat fonts.** Pick a font for the chat HUD from a menu. Bundled: Chewy, Fredoka, Comic Neue, Patrick Hand, Nunito, Pixelify Sans, plus the vanilla default. Switching is instant and applies to every new line (player chat, server messages and command feedback). Server resource-pack glyphs such as rank icons keep their own font, and anything a bundled font lacks (icons, CJK, symbols) falls back to the vanilla font instead of showing boxes.
+**Chat fonts.** Pick a font for the chat HUD from a menu. Bundled: Chewy, Fredoka, Comic Neue, Patrick Hand, Nunito, Pixelify Sans, plus the vanilla default. Switching is instant and applies to every new line (player chat, server messages and command feedback) and to the chat input box. Server resource-pack glyphs such as rank icons keep their own font, and anything a bundled font lacks (icons, CJK, symbols) falls back to the vanilla font instead of showing boxes.
+
+**Your own fonts.** Drop any `.ttf` into `config/betterchat/fonts/` and it shows up in the font picker as `custom_<file name>` after a resource reload (F3+T or `/betterchat reload`). The mod builds a small always-enabled resource pack from that folder; nothing to enable in the resource pack screen.
+
+**Chat HUD extras.** Each can be switched off in the menu.
+
+- Timestamps: every line is prefixed with `[HH:mm]` in dark grey.
+- Block chat clears: blank lines are dropped before they reach the chat, so a staff chat clear cannot push your chat away. The transcript still notes that a clear happened.
+- Mention ping: a line that says your username plays a note-block pling, turns gold and gets an `@` in front. Your own messages do not ping.
+- Longer history: the chat keeps 500 lines instead of vanilla's 100 (100 to 10000 in the menu).
+- A `Transcript` button in the top-right corner of the chat screen.
 
 **Transcript.** A scrollable screen with every chat line received, oldest at the top, newest at the bottom, with the sender's head next to each message, the time, and the sender's name.
 
@@ -21,7 +31,7 @@ Supported Minecraft versions: **26.3** and **26.1.2** (one jar per version). Req
 1. Install Fabric Loader 0.19.5 or newer for your Minecraft version.
 2. Put [Fabric API](https://modrinth.com/mod/fabric-api) for that Minecraft version in `mods/`.
 3. Download the Better Chat jar whose name ends in `+mc<your version>.jar` from the [Releases](../../releases) page and put it in `mods/`. RankMute is optional; put its jar in `mods/` too if you want hidden lines labelled.
-4. Start the game. A default config is written to `config/betterchat.json` on first launch.
+4. Start the game. A default config is written to `config/betterchat.json` on first launch, and `config/betterchat/fonts/` is created for your own `.ttf` files.
 
 The mod is marked `"environment": "client"` and is ignored on servers.
 
@@ -30,11 +40,11 @@ The mod is marked `"environment": "client"` and is ignored on servers.
 | How | What |
 |-----|------|
 | `H` key | Open the transcript. Rebind under Options > Controls > Better Chat. |
-| `/betterchat` | Open the Better Chat menu (font picker, with a preview; button to the transcript). |
+| `/betterchat` | Open the Better Chat menu: all toggles, chat history length, the font picker (with a preview) and a button to the transcript. |
 | `/betterchat transcript` | Open the transcript. |
 | `/betterchat fonts` | List font ids, each drawn in its own font. |
 | `/betterchat font <id>` | Set the chat font, e.g. `/betterchat font chewy`. Tab-completes. |
-| `/betterchat reload` | Re-read `config/betterchat.json` and today's transcript file. |
+| `/betterchat reload` | Re-read `config/betterchat.json` and today's transcript file, and pick up new `.ttf` files (triggers a resource reload if the set changed). |
 
 There is also an unbound key for the menu under Options > Controls > Better Chat.
 
@@ -51,11 +61,20 @@ Lines where no sender is found get a grey `!` head and are labelled `Server`.
 
 ## Config
 
-File: `config/betterchat.json`. Written with defaults if missing; see [`config.example.json`](config.example.json). The font is the only setting with a menu; edit the rest in the file and run `/betterchat reload`.
+File: `config/betterchat.json`. Written with defaults if missing; see [`config.example.json`](config.example.json). Everything in the first group has a button in `/betterchat`; edit the rest in the file and run `/betterchat reload`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `font` | `default` | Chat font id: `default`, `chewy`, `fredoka`, `comicneue`, `patrickhand`, `nunito`, `pixelifysans`. |
+| `font` | `default` | Chat font id: `default`, `chewy`, `fredoka`, `comicneue`, `patrickhand`, `nunito`, `pixelifysans`, or `custom_<name>` for a file in `config/betterchat/fonts/`. |
+| `inputBoxFont` | `true` | Draw what you type in the chat font too. |
+| `hudTimestamps` | `true` | Prefix every chat line with the time it arrived. |
+| `chatHistoryLines` | `500` | Lines the chat HUD keeps (100 to 10000). Vanilla keeps 100. |
+| `blockChatClear` | `true` | Drop blank lines before they reach the chat HUD. |
+| `mentionSound` | `true` | Play a pling when a line says your username (whole word, any case). |
+| `mentionHighlight` | `true` | Colour such lines gold and mark them with `@`. Text the server coloured explicitly keeps its colour. |
+| `chatScreenButton` | `true` | Show a Transcript button in the chat screen. |
+| `hudTimestampFormat` | `HH:mm` | java.time pattern for the chat prefix. |
+| `customFontSize` | `9.0` | Pixel size used for fonts from `config/betterchat/fonts/`. Vanilla text is about 8 px tall; raise or lower this if a font looks small or clipped. |
 | `transcriptMaxEntries` | `5000` | Most lines kept in memory for the live (today) view. Files on disk are not trimmed. |
 | `transcriptSaveToDisk` | `true` | Append every line to `config/betterchat/transcripts/<date>.jsonl`. With `false` the transcript only lasts for the session and `/betterchat reload` empties it. |
 | `transcriptKeepHidden` | `true` | Record lines that RankMute (or any other mod) hid from chat. |
@@ -68,11 +87,12 @@ If the file cannot be parsed, a warning is logged and defaults are used in memor
 
 ## How it works
 
-- **Fonts.** Each bundled TTF has a font definition in `assets/betterchat/font/<id>.json` that lists the TTF first and vanilla's `minecraft:default` as a fallback. A small mixin on `ChatComponent.addMessage` wraps each incoming line in a parent style carrying the selected font; text that already has an explicit font keeps it. No resource reload is needed to switch.
-- **Capture.** The mod listens to Fabric API's `ClientReceiveMessageEvents.ALLOW_CHAT` / `ALLOW_GAME` in its own event phase ordered before the default phase, so it sees every line before RankMute decides to drop it. If a later listener cancels the line, the `*_CANCELED` event marks the transcript entry as hidden. Action bar text is ignored.
+- **Fonts.** Each bundled TTF has a font definition in `assets/betterchat/font/<id>.json` that lists the TTF first and vanilla's `minecraft:default` as a fallback. A small mixin on `ChatComponent.addMessage` wraps each incoming line in a parent style carrying the selected font (after adding the timestamp and mention highlight); text that already has an explicit font keeps it. No resource reload is needed to switch. The same mixin raises the two `100` line limits in the chat HUD to `chatHistoryLines`. The input box gets the font through an `EditBox` formatter added when the chat screen opens.
+- **Custom fonts.** On every resource load the mod scans `config/betterchat/fonts/`, writes `config/betterchat/fontpack/` (a definition like the bundled ones plus a copy of each TTF) and adds it to the client's pack repository as a required pack, so it is always active. Nothing is generated when the folder is empty.
+- **Capture.** The mod listens to Fabric API's `ClientReceiveMessageEvents.ALLOW_CHAT` / `ALLOW_GAME` in its own event phase ordered before the default phase, so it sees every line before RankMute decides to drop it. If a later listener cancels the line, the `*_CANCELED` event marks the transcript entry as hidden. With `blockChatClear` on, the same listener answers "no" for blank lines so they never reach the HUD. Action bar text is ignored.
 - **Storage.** Each line is snapshotted into plain text runs with colour and formatting (hover and click events are dropped) and appended as one JSON object per line. The transcript never touches the chat HUD's own message list, which is what a chat clear empties.
 
-Out of scope for now: changing the font of the chat input box, loading your own TTF files, and any server-side component.
+Out of scope for now: any server-side component.
 
 ## Building from source
 
