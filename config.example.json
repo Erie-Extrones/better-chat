@@ -1,0 +1,10 @@
+{
+  "font": "chewy",
+  "transcriptMaxEntries": 5000,
+  "transcriptSaveToDisk": true,
+  "transcriptKeepHidden": true,
+  "chatClearThreshold": 20,
+  "chatClearWindowMs": 3000,
+  "senderPattern": "",
+  "timeFormat": "HH:mm:ss"
+}

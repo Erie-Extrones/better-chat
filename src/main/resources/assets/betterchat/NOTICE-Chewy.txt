@@ -1,0 +1,4 @@
+Chewy
+Copyright (c) 2010 by Font Diner, Inc DBA Sideshow. All rights reserved.
+Licensed under the Apache License, Version 2.0 (see LICENSE-Chewy.txt).
+Source: https://fonts.google.com/specimen/Chewy

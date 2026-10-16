@@ -1,0 +1,99 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+// Jar version is <mod_version>+mc<minecraft_version>, e.g. betterchat-1.0.0+mc26.3.jar,
+// so builds for different Minecraft targets never collide.
+version = "${project.mod_version}+mc${project.minecraft_version}"
+group = project.group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+}
+
+loom {
+	mods {
+		"betterchat" {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+// The handful of client APIs that differ between the supported Minecraft versions live in
+// src/compat/mc<version>/java, one directory per version with identical class names. Only the
+// directory for the version being built is compiled. Adding a Minecraft target means adding
+// a directory here and a matrix entry in .github/workflows/build.yml.
+def compatDir = file("src/compat/mc${project.minecraft_version}/java")
+if (!compatDir.directory) {
+	throw new GradleException("No compatibility sources for Minecraft ${project.minecraft_version}: expected ${compatDir}")
+}
+sourceSets.main.java.srcDir compatDir
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API: ClientReceiveMessageEvents, ClientCommandRegistrationCallback, KeyMappingHelper, ClientTickEvents.
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Plain JUnit for the Minecraft-free core tests. Gson is what the game ships; the store tests need it on the test classpath.
+	testImplementation platform("org.junit:junit-bom:5.13.4")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testImplementation "com.google.code.gson:gson:2.13.2"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+processResources {
+	def version = project.version
+	def minecraftVersion = project.minecraft_version
+	inputs.property "version", version
+	inputs.property "minecraft_version", minecraftVersion
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version, "minecraft_version": minecraftVersion
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+test {
+	useJUnitPlatform()
+	testLogging {
+		events "failed"
+		exceptionFormat "full"
+	}
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+	repositories {
+	}
+}

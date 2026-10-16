@@ -1,0 +1,16 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "betterchat:comicneue.ttf",
+			"size": 9.5,
+			"oversample": 3.0,
+			"shift": [0.0, 0.0],
+			"skip": ""
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:default"
+		}
+	]
+}

@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "betterchat",
+	"version": "${version}",
+	"name": "Better Chat",
+	"description": "Client-side chat polish: switchable chat fonts (Chewy and friends) and a transcript screen that keeps every message, with player heads, including lines hidden by RankMute and lines pushed away by a server chat clear. Nothing is sent to the server.",
+	"authors": [
+		"Erie"
+	],
+	"contact": {
+		"sources": "https://github.com/erie-extrones/better-chat",
+		"issues": "https://github.com/erie-extrones/better-chat/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.erie.betterchat.BetterChatClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "betterchat.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"rankmute": "*"
+	}
+}
