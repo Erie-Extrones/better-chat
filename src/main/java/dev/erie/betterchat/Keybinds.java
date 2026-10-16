@@ -11,6 +11,7 @@ import net.minecraft.resources.Identifier;
 import dev.erie.betterchat.gui.ScreenOpener;
 import dev.erie.betterchat.gui.SettingsScreen;
 import dev.erie.betterchat.gui.TranscriptScreen;
+import dev.erie.betterchat.hud.SpamControl;
 
 /** {@code H} opens the transcript; the menu key is unbound by default. Both can be changed in Controls. */
 public final class Keybinds {
@@ -33,6 +34,7 @@ public final class Keybinds {
 				ScreenOpener.open(new SettingsScreen(null));
 			}
 			ScreenOpener.tick();
+			SpamControl.tick(client);
 		});
 	}
 }

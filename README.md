@@ -18,6 +18,17 @@ Supported Minecraft versions: **26.3** and **26.1.2** (one jar per version). Req
 - Longer history: the chat keeps 500 lines instead of vanilla's 100 (100 to 10000 in the menu).
 - A `Transcript` button in the top-right corner of the chat screen.
 
+**Spam rules.** Repetitive server lines such as crate announcements (`Crates » Player X just got the Y reward from the Z Crate - INFINITY!`) can be hidden, collapsed or rewritten. A rule is a regex plus an action:
+
+| Action | Effect |
+|--------|--------|
+| `COLLAPSE` (default) | Show the first match in each window (15 s by default), hide the rest, then post one grey line: `Crate rewards: 12 more line(s) hidden, see the transcript`. |
+| `HIDE` | Never show matches in chat. |
+| `REWRITE` | Show a short line built from the regex groups instead, e.g. `Static_bee got Flash Boots (Blossom crate)`. The window limit still applies unless `maxPerWindow` is 0. |
+| `OFF` | Keep the rule but do nothing. |
+
+Hidden lines are still in the transcript, labelled with the rule that hid them. The crate rule ships enabled; switch its action in `/betterchat` > Spam rules, and add your own with `/betterchat spam add <regex>` or in the config.
+
 **Transcript.** A scrollable screen with every chat line received, oldest at the top, newest at the bottom, with the sender's head next to each message, the time, and the sender's name.
 
 - Lines RankMute hid from chat are in the transcript too, tinted red and labelled `hidden from chat by RankMute`.
@@ -44,6 +55,11 @@ The mod is marked `"environment": "client"` and is ignored on servers.
 | `/betterchat transcript` | Open the transcript. |
 | `/betterchat fonts` | List font ids, each drawn in its own font. |
 | `/betterchat font <id>` | Set the chat font, e.g. `/betterchat font chewy`. Tab-completes. |
+| `/betterchat spam` | List the spam rules with their index and action. |
+| `/betterchat spam test <text>` | Report which rule a line would match and what would happen to it. Paste a real line from `.minecraft/logs/latest.log`. |
+| `/betterchat spam add <regex>` | Add a collapse rule. Rename it or change its action, replacement and window in the config. |
+| `/betterchat spam set <index> <off\|hide\|collapse\|rewrite>` | Change a rule's action. |
+| `/betterchat spam remove <index>` | Delete a rule. |
 | `/betterchat reload` | Re-read `config/betterchat.json` and today's transcript file, and pick up new `.ttf` files (triggers a resource reload if the set changed). |
 
 There is also an unbound key for the menu under Options > Controls > Better Chat.
@@ -74,6 +90,9 @@ File: `config/betterchat.json`. Written with defaults if missing; see [`config.e
 | `mentionHighlight` | `true` | Colour such lines gold and mark them with `@`. Text the server coloured explicitly keeps its colour. |
 | `chatScreenButton` | `true` | Show a Transcript button in the chat screen. |
 | `hudTimestampFormat` | `HH:mm` | java.time pattern for the chat prefix. |
+| `spamRules` | one crate rule | List of `{ "name", "pattern", "action", "replacement", "maxPerWindow", "windowSeconds" }`. `pattern` is a Java regex matched anywhere in the line with `§` codes stripped (use `(?i)` for case-insensitive); the first matching rule wins. `replacement` uses `$1`, `$2`... for the regex groups. `maxPerWindow` 0 = unlimited. |
+| `spamSummary` | `true` | Post the "N more line(s) hidden" line after a burst goes quiet. |
+| `spamSummaryDelaySeconds` | `3` | Seconds of quiet before that line is posted. |
 | `customFontSize` | `9.0` | Pixel size used for fonts from `config/betterchat/fonts/`. Vanilla text is about 8 px tall; raise or lower this if a font looks small or clipped. |
 | `transcriptMaxEntries` | `5000` | Most lines kept in memory for the live (today) view. Files on disk are not trimmed. |
 | `transcriptSaveToDisk` | `true` | Append every line to `config/betterchat/transcripts/<date>.jsonl`. With `false` the transcript only lasts for the session and `/betterchat reload` empties it. |
@@ -89,7 +108,7 @@ If the file cannot be parsed, a warning is logged and defaults are used in memor
 
 - **Fonts.** Each bundled TTF has a font definition in `assets/betterchat/font/<id>.json` that lists the TTF first and vanilla's `minecraft:default` as a fallback. A small mixin on `ChatComponent.addMessage` wraps each incoming line in a parent style carrying the selected font (after adding the timestamp and mention highlight); text that already has an explicit font keeps it. No resource reload is needed to switch. The same mixin raises the two `100` line limits in the chat HUD to `chatHistoryLines`. The input box gets the font through an `EditBox` formatter added when the chat screen opens.
 - **Custom fonts.** On every resource load the mod scans `config/betterchat/fonts/`, writes `config/betterchat/fontpack/` (a definition like the bundled ones plus a copy of each TTF) and adds it to the client's pack repository as a required pack, so it is always active. Nothing is generated when the folder is empty.
-- **Capture.** The mod listens to Fabric API's `ClientReceiveMessageEvents.ALLOW_CHAT` / `ALLOW_GAME` in its own event phase ordered before the default phase, so it sees every line before RankMute decides to drop it. If a later listener cancels the line, the `*_CANCELED` event marks the transcript entry as hidden. With `blockChatClear` on, the same listener answers "no" for blank lines so they never reach the HUD. Action bar text is ignored.
+- **Capture.** The mod listens to Fabric API's `ClientReceiveMessageEvents.ALLOW_CHAT` / `ALLOW_GAME` in its own event phase ordered before the default phase, so it sees every line before RankMute decides to drop it. If a later listener cancels the line, the `*_CANCELED` event marks the transcript entry as hidden. With `blockChatClear` on, the same listener answers "no" for blank lines so they never reach the HUD, and the spam rules answer "no" for lines they hide or collapse (REWRITE rules swap the text in the HUD mixin). Action bar text is ignored.
 - **Storage.** Each line is snapshotted into plain text runs with colour and formatting (hover and click events are dropped) and appended as one JSON object per line. The transcript never touches the chat HUD's own message list, which is what a chat clear empties.
 
 Out of scope for now: any server-side component.

@@ -1,5 +1,9 @@
 package dev.erie.betterchat;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import dev.erie.betterchat.core.SpamRule;
 import dev.erie.betterchat.font.ChatFonts;
 
 /**
@@ -28,6 +32,13 @@ public class BetterChatConfig {
 	/** Add a "Transcript" button to the chat screen. */
 	public boolean chatScreenButton = true;
 
+	/** Rules for repetitive server lines (crate announcements and the like). See {@link SpamRule}. */
+	public List<SpamRule> spamRules = defaultSpamRules();
+	/** After a burst of hidden lines goes quiet, post one grey line saying how many were hidden. */
+	public boolean spamSummary = true;
+	/** Seconds of quiet before that summary is posted. */
+	public int spamSummaryDelaySeconds = 3;
+
 	/** Most entries kept in memory (and shown in the transcript screen) for the current day. */
 	public int transcriptMaxEntries = 5000;
 	/** Write every message to {@code config/betterchat/transcripts/<date>.jsonl} so it survives restarts. */
@@ -45,8 +56,27 @@ public class BetterChatConfig {
 	/** java.time pattern for the time column in the transcript screen. */
 	public String timeFormat = "HH:mm:ss";
 
+	/** The crate-reward announcement format this mod was written against: {@code Crates » Player X just got the Y reward from the Z Crate - ...}. */
+	public static List<SpamRule> defaultSpamRules() {
+		List<SpamRule> rules = new ArrayList<>();
+		rules.add(new SpamRule("Crate rewards",
+				"^\\W*Crates\\W+Player (\\S+) just got the (.+?) reward from the (.+?) Crate",
+				SpamRule.Action.COLLAPSE, "$1 got $2 ($3 crate)", 1, 15));
+		return rules;
+	}
+
 	/** Fills in anything Gson left null or out of range so the rest of the mod never null-checks. */
 	public BetterChatConfig normalize() {
+		if (spamRules == null) {
+			spamRules = new ArrayList<>();
+		}
+		spamRules.removeIf(r -> r == null);
+		for (int i = 0; i < spamRules.size(); i++) {
+			spamRules.get(i).normalize(i);
+		}
+		if (spamSummaryDelaySeconds < 1) {
+			spamSummaryDelaySeconds = 1;
+		}
 		if (font == null || font.isBlank()) {
 			font = ChatFonts.DEFAULT_ID;
 		}

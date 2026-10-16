@@ -13,7 +13,9 @@ import org.jspecify.annotations.Nullable;
 
 import dev.erie.betterchat.ConfigManager;
 import dev.erie.betterchat.core.FormattingCodes;
+import dev.erie.betterchat.core.SpamFilter;
 import dev.erie.betterchat.core.TranscriptEntry;
+import dev.erie.betterchat.hud.SpamControl;
 
 /**
  * Records every incoming chat line into the transcript, before any other mod can drop it.
@@ -28,7 +30,8 @@ import dev.erie.betterchat.core.TranscriptEntry;
  * knows whether it was hidden.
  *
  * <p>This is also where blank lines are dropped before they reach the chat HUD when
- * {@code blockChatClear} is on: a server-side chat clear is nothing but a burst of blank lines.
+ * {@code blockChatClear} is on (a server-side chat clear is nothing but a burst of blank lines), and
+ * where the spam rules hide or collapse repetitive server lines.
  */
 public final class ChatCapture {
 	private static final Identifier PHASE = Identifier.fromNamespaceAndPath("betterchat", "capture");
@@ -48,34 +51,42 @@ public final class ChatCapture {
 			TranscriptEntry entry = begin(message, null, TranscriptEntry.Kind.SYSTEM);
 			if (ConfigManager.get().blockChatClear && entry.isBlank()) {
 				// Keeps the HUD intact; the transcript still counts the blank burst and writes its marker.
-				commit(false);
+				commit(null);
 				return false;
 			}
-			return true;
+			return applySpamRules(entry);
 		});
 		ClientReceiveMessageEvents.GAME_CANCELED.register((message, overlay) -> {
 			if (!overlay) {
-				commit(true);
+				commit(filterName());
 			}
 		});
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
 			if (!overlay) {
-				commit(false);
+				commit(null);
 			}
 		});
 
 		ClientReceiveMessageEvents.ALLOW_CHAT.addPhaseOrdering(PHASE, Event.DEFAULT_PHASE);
-		ClientReceiveMessageEvents.ALLOW_CHAT.register(PHASE, (message, signedMessage, sender, params, receptionTimestamp) -> {
-			begin(message, sender, TranscriptEntry.Kind.CHAT);
+		ClientReceiveMessageEvents.ALLOW_CHAT.register(PHASE, (message, signedMessage, sender, params, receptionTimestamp) ->
+				applySpamRules(begin(message, sender, TranscriptEntry.Kind.CHAT)));
+		ClientReceiveMessageEvents.CHAT_CANCELED.register((message, signedMessage, sender, params, receptionTimestamp) -> commit(filterName()));
+		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> commit(null));
+	}
+
+	/** Runs the spam rules; a line they hide is committed as hidden right away and kept from the HUD. */
+	private static boolean applySpamRules(TranscriptEntry entry) {
+		SpamFilter.Decision decision = SpamControl.filter().decide(entry.plainText(), entry.time);
+		if (decision.show()) {
 			return true;
-		});
-		ClientReceiveMessageEvents.CHAT_CANCELED.register((message, signedMessage, sender, params, receptionTimestamp) -> commit(true));
-		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> commit(false));
+		}
+		commit(SpamControl.hiddenBy(decision.rule()));
+		return false;
 	}
 
 	private static TranscriptEntry begin(Component message, @Nullable GameProfile signedSender, TranscriptEntry.Kind kind) {
 		// A previous message whose follow-up event never fired (a listener threw) is still worth keeping.
-		commit(false);
+		commit(null);
 
 		TranscriptEntry entry = new TranscriptEntry();
 		entry.time = System.currentTimeMillis();
@@ -93,15 +104,16 @@ public final class ChatCapture {
 		return entry;
 	}
 
-	private static void commit(boolean hidden) {
+	/** Commits the pending entry; {@code hiddenBy} names what kept it out of the HUD, or {@code null} if it was shown. */
+	private static void commit(@Nullable String hiddenBy) {
 		TranscriptEntry entry = pending;
 		if (entry == null) {
 			return;
 		}
 		pending = null;
-		if (hidden) {
+		if (hiddenBy != null) {
 			entry.hidden = true;
-			entry.hiddenBy = filterName();
+			entry.hiddenBy = hiddenBy;
 		}
 		lastCommitted = entry;
 		TranscriptManager.add(entry);

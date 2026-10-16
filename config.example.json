@@ -15,5 +15,17 @@
   "chatClearThreshold": 20,
   "chatClearWindowMs": 3000,
   "senderPattern": "",
-  "timeFormat": "HH:mm:ss"
+  "timeFormat": "HH:mm:ss",
+  "spamRules": [
+    {
+      "name": "Crate rewards",
+      "pattern": "^\\W*Crates\\W+Player (\\S+) just got the (.+?) reward from the (.+?) Crate",
+      "action": "COLLAPSE",
+      "replacement": "$1 got $2 ($3 crate)",
+      "maxPerWindow": 1,
+      "windowSeconds": 15
+    }
+  ],
+  "spamSummary": true,
+  "spamSummaryDelaySeconds": 3
 }

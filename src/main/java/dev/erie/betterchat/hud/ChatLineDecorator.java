@@ -22,8 +22,8 @@ import dev.erie.betterchat.font.ChatFonts;
 import dev.erie.betterchat.transcript.ChatCapture;
 
 /**
- * Everything the mod does to a line right before the chat HUD stores it: mention ping and highlight,
- * timestamp prefix, chat font. Called from {@code ChatComponentMixin} exactly once per line.
+ * Everything the mod does to a line right before the chat HUD stores it: spam-rule rewrite, mention
+ * ping and highlight, timestamp prefix, chat font. Called from {@code ChatComponentMixin} exactly once per line.
  */
 public final class ChatLineDecorator {
 	private static @Nullable DateTimeFormatter timestampFormatter;
@@ -39,6 +39,13 @@ public final class ChatLineDecorator {
 		BetterChatConfig cfg = ConfigManager.get();
 		TranscriptEntry entry = ChatCapture.takeLastCommitted();
 		Component result = message;
+
+		// REWRITE spam rules: the window check already happened when the line was allowed through.
+		String rewritten = SpamControl.filter().rewriteOnly(FormattingCodes.strip(message.getString()));
+		if (rewritten != null && !rewritten.isBlank()) {
+			result = Component.literal(rewritten).withStyle(ChatFormatting.GRAY);
+			message = result;
+		}
 
 		if ((cfg.mentionSound || cfg.mentionHighlight) && mentionsMe(message, entry)) {
 			if (cfg.mentionSound) {

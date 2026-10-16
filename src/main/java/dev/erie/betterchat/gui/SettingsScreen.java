@@ -80,6 +80,14 @@ public class SettingsScreen extends Screen {
 				"Show a Transcript button in the top-right corner of the chat screen.");
 		row++;
 
+		this.addRenderableWidget(Button.builder(Component.literal("Spam rules: " + cfg.spamRules.size()), b -> ScreenOpener.open(new SpamRulesScreen(this)))
+				.bounds(leftX, rowY(row), BUTTON_WIDTH, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.literal("Hide, collapse or rewrite repetitive server lines such as crate announcements.")))
+				.build());
+		this.toggle(rightX, rowY(row), "Hidden-line summaries", cfg.spamSummary, v -> ConfigManager.get().spamSummary = v,
+				"After a burst of hidden lines, post one grey line saying how many were hidden.");
+		row++;
+
 		this.previewY = rowY(row) + 4;
 
 		int bottomY = this.height - 28;
